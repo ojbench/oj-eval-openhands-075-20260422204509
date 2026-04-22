@@ -60,6 +60,7 @@ public:
 
     // Element access (0-based)
     char& operator[](size_t pos) { return data_[pos]; }
+    const char& operator[](size_t pos) const { return data_[pos]; }
 
     // Length accessor
     size_t len() const { return len_; }
