@@ -55,34 +55,44 @@ class ACMOJClient:
                      params: Dict[str, Any] = None) -> Optional[Dict]:
         # Try primary base, then fallbacks on 404/405
         bases = [self.api_base] + [b for b in self.fallback_bases if b != self.api_base]
+        # Extra variants to try by prefixing /api or /api/v1 when missing
+        def endpoint_variants(base: str, ep: str):
+            variants = [f"{base}{ep}"]
+            if "/api" not in base:
+                variants.append(f"{base}/api{ep}")
+                variants.append(f"{base}/api/v1{ep}")
+            elif "/api/v1" not in base:
+                variants.append(f"{base}/v1{ep}")
+            return variants
+
         last_error = None
         for base in bases:
-            url = f"{base}{endpoint}"
-            try:
-                if method.upper() == "GET":
-                    response = requests.get(url, headers=self.headers, params=params, timeout=10)
-                elif method.upper() == "POST":
-                    response = requests.post(url, headers=self.headers, data=data, timeout=10)
-                else:
-                    print(f"Unsupported HTTP method: {method}")
-                    return None
+            for url in endpoint_variants(base, endpoint):
+                try:
+                    if method.upper() == "GET":
+                        response = requests.get(url, headers=self.headers, params=params, timeout=10)
+                    elif method.upper() == "POST":
+                        response = requests.post(url, headers=self.headers, data=data, timeout=10)
+                    else:
+                        print(f"Unsupported HTTP method: {method}")
+                        return None
 
-                if response.status_code in (404, 405):
-                    last_error = response
+                    if response.status_code in (404, 405):
+                        last_error = response
+                        continue
+
+                    if response.status_code == 204:
+                        return {"status": "success", "message": "Operation successful"}
+
+                    response.raise_for_status()
+
+                    if response.content:
+                        return response.json()
+                    else:
+                        return {"status": "success"}
+                except requests.exceptions.RequestException as e:
+                    last_error = e
                     continue
-
-                if response.status_code == 204:
-                    return {"status": "success", "message": "Operation successful"}
-
-                response.raise_for_status()
-
-                if response.content:
-                    return response.json()
-                else:
-                    return {"status": "success"}
-            except requests.exceptions.RequestException as e:
-                last_error = e
-                continue
         # If all bases failed
         if isinstance(last_error, requests.Response):
             print(f"API Request failed: {last_error.status_code} for all bases")
