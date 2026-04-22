@@ -34,7 +34,14 @@ from datetime import datetime
 
 class ACMOJClient:
     def __init__(self, access_token: str):
-        self.api_base = "https://acm.sjtu.edu.cn/OnlineJudge/api/v1"
+        # Allow overriding API base via environment variable
+        self.api_base = os.environ.get("ACMOJ_API_BASE", "https://acm.sjtu.edu.cn/OnlineJudge/api/v1")
+        self.fallback_bases = [
+            self.api_base,
+            "https://acm.sjtu.edu.cn/OnlineJudge3/api/v1",
+            "https://acm.sjtu.edu.cn/OnlineJudge3/api",
+            "https://acm.sjtu.edu.cn/OnlineJudge/api",
+        ]
         self.headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/x-www-form-urlencoded",
@@ -46,31 +53,43 @@ class ACMOJClient:
 
     def _make_request(self, method: str, endpoint: str, data: Dict[str, Any] = None, 
                      params: Dict[str, Any] = None) -> Optional[Dict]:
-        url = f"{self.api_base}{endpoint}"
-        try:
-            if method.upper() == "GET":
-                response = requests.get(url, headers=self.headers, params=params, timeout=10)
-            elif method.upper() == "POST":
-                response = requests.post(url, headers=self.headers, data=data, timeout=10)
-            else:
-                print(f"Unsupported HTTP method: {method}")
-                return None
+        # Try primary base, then fallbacks on 404/405
+        bases = [self.api_base] + [b for b in self.fallback_bases if b != self.api_base]
+        last_error = None
+        for base in bases:
+            url = f"{base}{endpoint}"
+            try:
+                if method.upper() == "GET":
+                    response = requests.get(url, headers=self.headers, params=params, timeout=10)
+                elif method.upper() == "POST":
+                    response = requests.post(url, headers=self.headers, data=data, timeout=10)
+                else:
+                    print(f"Unsupported HTTP method: {method}")
+                    return None
 
-            if response.status_code == 204:
-                return {"status": "success", "message": "Operation successful"}
+                if response.status_code in (404, 405):
+                    last_error = response
+                    continue
 
-            response.raise_for_status()
-            
-            if response.content:
-                return response.json()
-            else:
-                return {"status": "success"}
+                if response.status_code == 204:
+                    return {"status": "success", "message": "Operation successful"}
 
-        except requests.exceptions.RequestException as e:
-            print(f"API Request failed: {e}")
-            if 'response' in locals() and response:
-                print(f"Response text: {response.text}")
-            return None
+                response.raise_for_status()
+
+                if response.content:
+                    return response.json()
+                else:
+                    return {"status": "success"}
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                continue
+        # If all bases failed
+        if isinstance(last_error, requests.Response):
+            print(f"API Request failed: {last_error.status_code} for all bases")
+            print(f"Response text: {last_error.text}")
+        else:
+            print(f"API Request failed: {last_error}")
+        return None
 
     def _save_submission_id(self, submission_id):
         try:
