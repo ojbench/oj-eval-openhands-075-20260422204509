@@ -126,17 +126,63 @@ class ACMOJClient:
 
     def submit_git(self, problem_id: int, git_url: str) -> Optional[Dict]:
         data = {"language": "git", "code": git_url}
-        result = self._make_request("POST", f"/problem/{problem_id}/submit", data=data)
-        if result and 'id' in result:
-            self._save_submission_id(result['id'])
+        # Try multiple endpoint patterns
+        pid = str(problem_id)
+        alt_ids = [pid]
+        try:
+            # also try zero-padded variant like 075
+            alt_ids.append(pid.zfill(3))
+        except Exception:
+            pass
+        endpoints = []
+        for aid in alt_ids:
+            endpoints.extend([
+                f"/problem/{aid}/submit",
+                f"/problems/{aid}/submit",
+                f"/problem/{aid}/submissions",
+                f"/problems/{aid}/submissions",
+            ])
+        endpoints.extend([
+            "/submission",
+            "/submissions",
+            "/submit",
+            "/git/submit",
+        ])
 
-        return result
+        for ep in endpoints:
+            result = self._make_request("POST", ep, data=data)
+            if result:
+                if 'id' in result:
+                    self._save_submission_id(result['id'])
+                return result
+        return None
 
     def get_submission_detail(self, submission_id: int) -> Optional[Dict]:
-        return self._make_request("GET", f"/submission/{submission_id}")
+        # Try multiple status endpoints
+        candidates = [
+            f"/submission/{submission_id}",
+            f"/submissions/{submission_id}",
+            f"/submission/{submission_id}/detail",
+            f"/submissions/{submission_id}/detail",
+        ]
+        for ep in candidates:
+            res = self._make_request("GET", ep)
+            if res:
+                return res
+        return None
 
     def abort_submission(self, submission_id: int) -> Optional[Dict]:
-        return self._make_request("POST", f"/submission/{submission_id}/abort")
+        candidates = [
+            f"/submission/{submission_id}/abort",
+            f"/submissions/{submission_id}/abort",
+            f"/submission/{submission_id}/cancel",
+            f"/submissions/{submission_id}/cancel",
+        ]
+        for ep in candidates:
+            res = self._make_request("POST", ep)
+            if res:
+                return res
+        return None
 
 
 def main():
