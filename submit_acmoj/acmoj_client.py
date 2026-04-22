@@ -65,14 +65,22 @@ class ACMOJClient:
                 variants.append(f"{base}/v1{ep}")
             return variants
 
+        # Proxy handling: allow forcing proxy via env var
+        use_proxy = os.environ.get("ACMOJ_USE_PROXY") in ("1", "true", "True")
+        proxies = None
+        if use_proxy:
+            hp = os.environ.get("http_proxy")
+            sp = os.environ.get("https_proxy")
+            proxies = {"http": hp, "https": sp}
+
         last_error = None
         for base in bases:
             for url in endpoint_variants(base, endpoint):
                 try:
                     if method.upper() == "GET":
-                        response = requests.get(url, headers=self.headers, params=params, timeout=10)
+                        response = requests.get(url, headers=self.headers, params=params, timeout=10, proxies=proxies)
                     elif method.upper() == "POST":
-                        response = requests.post(url, headers=self.headers, data=data, timeout=10)
+                        response = requests.post(url, headers=self.headers, data=data, timeout=10, proxies=proxies)
                     else:
                         print(f"Unsupported HTTP method: {method}")
                         return None
