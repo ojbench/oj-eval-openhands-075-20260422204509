@@ -18,6 +18,8 @@ private:
     }
 
 public:
+    // Expose C-string view if needed
+    const char* c_str() const { return data_; }
     // Default constructor: empty string
     str() : data_(nullptr), len_(0) { allocate_and_copy("", 0); }
 
