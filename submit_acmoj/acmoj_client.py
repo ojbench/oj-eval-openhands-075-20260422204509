@@ -49,9 +49,9 @@ class ACMOJClient:
         url = f"{self.api_base}{endpoint}"
         try:
             if method.upper() == "GET":
-                response = requests.get(url, headers=self.headers, params=params, timeout=10, proxies={"https": None, "http": None})
+                response = requests.get(url, headers=self.headers, params=params, timeout=10)
             elif method.upper() == "POST":
-                response = requests.post(url, headers=self.headers, data=data, timeout=10, proxies={"https": None, "http": None})
+                response = requests.post(url, headers=self.headers, data=data, timeout=10)
             else:
                 print(f"Unsupported HTTP method: {method}")
                 return None
