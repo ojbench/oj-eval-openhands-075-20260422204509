@@ -24,20 +24,26 @@ public:
     // Construct from single character
     explicit str(const char& c) : data_(nullptr), len_(0) { allocate_and_copy(&c, 1); }
 
-    // Construct from rvalue const char* (treat as const char*)
-    explicit str(const char*&& s_) : data_(nullptr), len_(0) {
-        const char* s = s_ ? s_ : "";
-        allocate_and_copy(s, std::strlen(s));
+    // Construct from const char* (accept both lvalue and rvalue)
+    explicit str(const char* s) : data_(nullptr), len_(0) {
+        const char* p = s ? s : "";
+        allocate_and_copy(p, std::strlen(p));
     }
 
-    // Assign from rvalue const char* (copy contents)
-    str& operator=(const char*&& s_) {
-        const char* s = s_ ? s_ : "";
-        if (s == data_) return *this; // self-assignment safety if pointer matches
+    // Also provide rvalue-overload to satisfy given signature
+    explicit str(const char*&& s_) : str(static_cast<const char*>(s_)) {}
+
+    // Assign from const char* (copy contents)
+    str& operator=(const char* s) {
+        const char* p = s ? s : "";
+        if (p == data_) return *this;
         delete[] data_;
-        allocate_and_copy(s, std::strlen(s));
+        allocate_and_copy(p, std::strlen(p));
         return *this;
     }
+
+    // Assign from rvalue const char* to satisfy given signature
+    str& operator=(const char*&& s_) { return (*this = static_cast<const char*>(s_)); }
 
     // Copy constructor
     str(const str& other) : data_(nullptr), len_(0) { allocate_and_copy(other.data_, other.len_); }
